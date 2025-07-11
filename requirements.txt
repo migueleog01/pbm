@@ -1,0 +1,3 @@
+sounddevice
+numpy
+whispercpp @ git+https://github.com/ggerganov/whisper.cpp#subdirectory=bindings/python 
