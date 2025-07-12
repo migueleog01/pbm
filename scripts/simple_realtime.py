@@ -14,8 +14,8 @@ import signal
 import sys
 
 # Optimal settings for base.en-q5_1 on M1 Pro
-MODEL_PATH = 'whisper.cpp\\models\\ggml-base.en-q5_1.bin'
-WHISPER_CLI = 'whisper.cpp\\build\\bin\\whisper-cli.exe'
+MODEL_PATH = 'whisper.cpp/models/ggml-base.en-q5_1.bin'
+WHISPER_CLI = 'whisper.cpp/build/bin/whisper-cli'
 OPTIMAL_THREADS = 8
 OPTIMAL_BEAM = 3
 OPTIMAL_BEST_OF = 1
