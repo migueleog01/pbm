@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
 Simple, Reliable Real-Time Transcription with Optimal Base.en Settings
+Using Python Whisper Library (Windows Compatible)
 """
 
-import subprocess
+import whisper
 import tempfile
 import time
 import wave
@@ -13,14 +14,13 @@ from pathlib import Path
 import signal
 import sys
 
-# Optimal settings for base.en-q5_1 on M1 Pro
-MODEL_PATH = 'whisper.cpp\\models\\ggml-base.en-q5_1.bin'
-WHISPER_CLI = 'whisper.cpp\\build\\bin\\whisper-cli.exe'
+# Optimal settings for base.en on Windows (matching SETTINGS_SUMMARY.md)
+MODEL_NAME = 'base.en'  # 57MB quantized equivalent
 OPTIMAL_THREADS = 8
 OPTIMAL_BEAM = 3
 OPTIMAL_BEST_OF = 1
 
-# Audio settings
+# Audio settings (matching SETTINGS_SUMMARY.md)
 SAMPLE_RATE = 16000
 CHUNK_DURATION = 3.0  # Process every 3 seconds
 SILENCE_THRESHOLD = 0.005  # Minimum audio level to process
@@ -31,17 +31,14 @@ class SimpleRealTimeTranscriber:
         self.audio_buffer = []
         self.buffer_duration = 0.0
         
-        # Check if model exists
-        if not Path(MODEL_PATH).exists():
-            print(f"❌ Model not found: {MODEL_PATH}")
-            print("Run: cd whisper.cpp && bash models/download-ggml-model.sh base.en-q5_1")
+        print("🔄 Loading Whisper model...")
+        try:
+            # Load the optimal model
+            self.model = whisper.load_model(MODEL_NAME)
+            print(f"✅ Model '{MODEL_NAME}' loaded successfully!")
+        except Exception as e:
+            print(f"❌ Error loading model: {e}")
             sys.exit(1)
-            
-        if not Path(WHISPER_CLI).exists():
-            print(f"❌ Whisper CLI not found: {WHISPER_CLI}")
-            sys.exit(1)
-            
-        print("✅ Model and CLI found!")
         
         # Set up signal handling
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -61,63 +58,31 @@ class SimpleRealTimeTranscriber:
         if rms < SILENCE_THRESHOLD:
             return None
         
-        # Save to temporary WAV file
-        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp_file:
-            with wave.open(tmp_file.name, 'wb') as wav_file:
-                wav_file.setnchannels(1)
-                wav_file.setsampwidth(2)
-                wav_file.setframerate(SAMPLE_RATE)
-                
-                # Convert to int16
-                audio_int16 = (audio_data * 32767).astype(np.int16)
-                wav_file.writeframes(audio_int16.tobytes())
-        
         try:
-            # Run whisper with optimal settings
-            cmd = [
-                WHISPER_CLI,
-                '-m', MODEL_PATH,
-                '-f', tmp_file.name,
-                '-t', str(OPTIMAL_THREADS),
-                '--beam-size', str(OPTIMAL_BEAM),
-                '--best-of', str(OPTIMAL_BEST_OF),
-                '--language', 'en',
-                '--no-timestamps'
-            ]
-            
             start_time = time.time()
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            
+            # Use optimal settings matching SETTINGS_SUMMARY.md
+            # Pass audio data directly to whisper instead of using temp files
+            result = self.model.transcribe(
+                audio_data,
+                language='en',
+                beam_size=OPTIMAL_BEAM,
+                best_of=OPTIMAL_BEST_OF,
+                temperature=0.0,  # Deterministic output
+                no_speech_threshold=0.1,
+                condition_on_previous_text=False
+            )
+            
             end_time = time.time()
             
-            if result.returncode == 0:
-                # Parse whisper output - it typically contains metadata followed by text
-                full_output = result.stdout.strip()
-                
-                # Extract the actual transcription (usually the last non-empty line)
-                lines = [line.strip() for line in full_output.split('\n') if line.strip()]
-                
-                # Find the transcription (skip metadata lines)
-                text = None
-                for line in reversed(lines):
-                    # Skip common metadata patterns
-                    if not any(pattern in line.lower() for pattern in ['[', 'whisper', 'processing', 'model']):
-                        text = line
-                        break
-                
-                if text and len(text) > 2:
-                    inference_time = end_time - start_time
-                    print(f"⚡ {inference_time:.2f}s | {text}")
-                    return text
-            else:
-                print(f"❌ Whisper error: {result.stderr}")
+            text = result['text'].strip()
+            if text and len(text) > 2:
+                inference_time = end_time - start_time
+                print(f"⚡ {inference_time:.2f}s | {text}")
+                return text
             
-        except subprocess.TimeoutExpired:
-            print("⏱️ Timeout")
         except Exception as e:
             print(f"❌ Error: {e}")
-        finally:
-            # Clean up temp file
-            Path(tmp_file.name).unlink(missing_ok=True)
         
         return None
     
@@ -153,8 +118,9 @@ class SimpleRealTimeTranscriber:
     
     def start_listening(self):
         """Start real-time transcription."""
-        print("🎤 Starting real-time transcription with optimal base.en-q5_1 settings")
-        print(f"⚙️  Threads: {OPTIMAL_THREADS}, Beam: {OPTIMAL_BEAM}, Best-of: {OPTIMAL_BEST_OF}")
+        print("🎤 Starting real-time transcription with optimal base.en settings")
+        print(f"⚙️  Model: {MODEL_NAME}, Beam: {OPTIMAL_BEAM}, Best-of: {OPTIMAL_BEST_OF}")
+        print(f"🎯 Target: <0.5s processing time (your optimal config)")
         print("🎧 Listening... speak clearly!")
         print("Press Ctrl+C to stop")
         
