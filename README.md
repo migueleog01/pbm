@@ -236,6 +236,37 @@ CHUNK_DURATION = 3.0       # Process every 3 seconds
 MIN_AUDIO_LENGTH = 0.5     # Minimum speech duration
 ```
 
+## 🔁 Next Steps: NPU Optimization
+
+Once you've proven the flow (mic → whisper → Mermaid works great) on Snapdragon X Elite, then you can:
+
+### Phase 1: ONNX Export
+- Export Whisper model to ONNX format
+- Validate ONNX model accuracy vs original
+- Test ONNX runtime performance on CPU
+
+### Phase 2: Qualcomm NPU Integration
+- Use Qualcomm's QNN tools to quantize and compile the model
+- Run with SNPE or QNN runtime on the Hexagon NPU
+- Benchmark NPU vs CPU performance
+
+### Phase 3: System Integration
+- Integrate NPU inference into the pipeline
+- Optimize audio preprocessing for NPU
+- Fine-tune for maximum efficiency
+
+### ➡️ Expected Benefits
+- **Lower CPU usage**: Offload inference to dedicated NPU
+- **Reduced power consumption**: NPU optimized for ML workloads
+- **Potentially faster inference**: Hardware acceleration
+- **Better battery life**: More efficient processing
+
+### 🛠️ NPU Development Tools
+- **Qualcomm Neural Processing SDK**: QNN tools and runtime
+- **SNPE (Snapdragon Neural Processing Engine)**: Legacy runtime
+- **Model conversion**: ONNX → QNN format
+- **Profiling tools**: Performance analysis and optimization
+
 ## 🔄 Version History
 
 - **v1.0**: Basic transcription working
@@ -243,10 +274,12 @@ MIN_AUDIO_LENGTH = 0.5     # Minimum speech duration
 - **v1.2**: Optimized for M1 Pro performance
 - **v1.3**: Fixed --fp16 flag issue
 - **v1.4**: Added comprehensive documentation
+- **v1.5**: Added NPU optimization roadmap
 
 ---
 
 **Hardware Tested**: M1 Pro MacBook Pro  
 **Target Platform**: Windows Snapdragon X Elite  
 **Performance**: 714x real-time transcription speed  
-**Accuracy**: Excellent for clear speech input 
+**Accuracy**: Excellent for clear speech input  
+**Future**: NPU optimization for enhanced efficiency 

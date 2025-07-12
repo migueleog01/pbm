@@ -89,6 +89,14 @@ whisper-cli -m models/ggml-base.en-q5_1.bin -f audio.wav -t 8 --beam-size 3 --be
 - [ ] Tune thread count for X Elite cores
 - [ ] Benchmark performance vs M1 Pro
 
+### NPU Optimization (Future)
+- [ ] Export Whisper model to ONNX format
+- [ ] Install Qualcomm Neural Processing SDK
+- [ ] Convert ONNX to QNN format for Hexagon NPU
+- [ ] Integrate NPU runtime into pipeline
+- [ ] Benchmark NPU vs CPU performance
+- [ ] Optimize for power efficiency
+
 ## 🏆 Success Criteria
 
 ### Must Work
@@ -103,8 +111,26 @@ whisper-cli -m models/ggml-base.en-q5_1.bin -f audio.wav -t 8 --beam-size 3 --be
 - Multiple speakers distinguished
 - Diagram commands detected
 
+## 🔁 NPU Future Enhancement
+
+Once CPU version works perfectly on Snapdragon X Elite:
+
+### ➡️ Expected NPU Benefits
+- **CPU Usage**: 50% → 20% reduction
+- **Power**: 30-50% less consumption  
+- **Speed**: Potentially <0.2s per chunk
+- **Battery**: Extended runtime
+- **Temperature**: Cooler operation
+
+### 🛠️ NPU Tools Required
+- Qualcomm Neural Processing SDK
+- QNN tools for model conversion
+- SNPE or QNN runtime
+- ONNX export capabilities
+
 ---
 
 **Status**: ✅ Optimized and documented  
 **Ready for**: Windows Snapdragon X Elite migration  
-**Next**: Test on target hardware and tune as needed 
+**Next**: Test on target hardware → NPU optimization  
+**Future**: Hexagon NPU acceleration for enhanced efficiency 

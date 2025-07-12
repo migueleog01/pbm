@@ -216,9 +216,61 @@ print(f"⚡ {end_time - start_time:.2f}s | {text}")
 - **Voice Activity**: Clear start/stop detection
 - **Output Quality**: Clean, readable text
 
+## 🔁 Future: NPU Optimization
+
+Once the CPU-based system is working well on Snapdragon X Elite, optimize further with NPU:
+
+### ONNX Export Process
+```bash
+# Export whisper model to ONNX
+python -m onnxruntime.tools.convert_model_from_pytorch \
+  --model_path whisper_model \
+  --output_path whisper_model.onnx
+
+# Validate ONNX model
+python validate_onnx_model.py
+```
+
+### Qualcomm NPU Integration
+```bash
+# Install Qualcomm Neural Processing SDK
+# Convert ONNX to QNN format
+qnn-onnx-converter \
+  --input_network whisper_model.onnx \
+  --output_path whisper_model.cpp
+
+# Compile for Hexagon NPU
+qnn-model-lib-generator \
+  --model whisper_model.cpp \
+  --backend libQnnHtp.so
+```
+
+### Expected NPU Performance
+- **CPU Usage**: Reduce from 50% to ~20%
+- **Power Consumption**: 30-50% reduction
+- **Inference Time**: Potentially <0.2s per chunk
+- **Battery Life**: Extended runtime
+- **Thermal**: Cooler operation
+
+### NPU Development Workflow
+1. **Phase 1**: Get CPU version working perfectly
+2. **Phase 2**: Export to ONNX and validate accuracy
+3. **Phase 3**: Convert to QNN and test NPU performance
+4. **Phase 4**: Integrate NPU runtime into pipeline
+5. **Phase 5**: Optimize and benchmark vs CPU
+
+### NPU Configuration Variables
+```python
+# NPU-specific settings (future)
+USE_NPU = True
+NPU_BACKEND = "libQnnHtp.so"  # Hexagon NPU
+NPU_PRECISION = "fp16"        # NPU precision
+NPU_CACHE_DIR = "npu_cache/"  # Model cache
+```
+
 ---
 
 **Configuration Status**: ✅ Optimized for M1 Pro  
 **Target Platform**: Windows Snapdragon X Elite  
-**Next Steps**: Test and tune on target hardware  
-**Contact**: Ready for hardware migration 
+**Next Steps**: Test and tune on target hardware → NPU optimization  
+**Contact**: Ready for hardware migration and NPU development 
