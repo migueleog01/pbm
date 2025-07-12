@@ -36,7 +36,7 @@ cd ../..
 
 ```bash
 cd whisper.cpp
-python models/download-ggml-model.py tiny.en
+bash models/download-ggml-model.sh tiny.en
 cd ..
 ```
 
@@ -113,7 +113,7 @@ Press `Ctrl+C` to gracefully exit the application.
 
 **Windows**: Ensure Visual Studio Build Tools are installed with C++ development tools.
 
-**macOS**: Install Xcode Command Line Tools if CMake fails.
+**macOS**: Install Xcode Command Line Tools if CMake fails. Install CMake via Homebrew: `brew install cmake`
 
 **Linux**: Install build essentials: `sudo apt-get install build-essential cmake`
 
@@ -125,10 +125,11 @@ Press `Ctrl+C` to gracefully exit the application.
 
 ### Python Dependencies
 
-If whispercpp installation fails, ensure whisper.cpp is built first, then retry:
-```bash
-pip install --force-reinstall whispercpp
-```
+The project uses a simplified approach with just two dependencies:
+- `sounddevice`: For audio capture
+- `numpy`: For audio processing
+
+The whisper processing is handled through the built whisper-cli executable.
 
 ## TODO - Future Phases
 

@@ -16,12 +16,9 @@ from typing import Optional
 
 import numpy as np
 import sounddevice as sd
-
-try:
-    import whispercpp as wc
-except ImportError:
-    print("ERROR: whispercpp not found. Please install requirements.txt")
-    sys.exit(1)
+import subprocess
+import tempfile
+import wave
 
 # Audio configuration
 SAMPLE_RATE = 16000  # 16 kHz for whisper
@@ -33,7 +30,6 @@ BUFFER_SIZE = int(SAMPLE_RATE * BUFFER_DURATION)
 # Global state
 audio_buffer = np.zeros(BUFFER_SIZE, dtype=np.float32)
 buffer_index = 0
-whisper_model = None
 running = True
 
 
@@ -75,8 +71,8 @@ graph TD
 ```"""
 
 
-def process_audio_chunk(audio_chunk: np.ndarray) -> Optional[str]:
-    """Process audio chunk through whisper and return transcript."""
+def process_audio_chunk(audio_chunk: np.ndarray, whisper_cli_path: str, model_path: str) -> Optional[str]:
+    """Process audio chunk through whisper CLI and return transcript."""
     try:
         # Ensure audio is in the right format for whisper
         if audio_chunk.dtype != np.float32:
@@ -86,18 +82,41 @@ def process_audio_chunk(audio_chunk: np.ndarray) -> Optional[str]:
         if np.max(np.abs(audio_chunk)) > 1.0:
             audio_chunk = audio_chunk / np.max(np.abs(audio_chunk))
         
-        # Transcribe using whisper
-        result = whisper_model.transcribe(audio_chunk)
+        # Create temporary WAV file
+        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp_file:
+            tmp_path = tmp_file.name
+            
+            # Write audio to WAV file
+            with wave.open(tmp_path, 'wb') as wav_file:
+                wav_file.setnchannels(1)  # mono
+                wav_file.setsampwidth(2)  # 16-bit
+                wav_file.setframerate(SAMPLE_RATE)
+                
+                # Convert float32 to int16
+                audio_int16 = (audio_chunk * 32767).astype(np.int16)
+                wav_file.writeframes(audio_int16.tobytes())
         
-        # Extract text from result
-        if hasattr(result, 'text'):
-            text = result.text.strip()
-        elif isinstance(result, str):
-            text = result.strip()
+        # Run whisper CLI
+        result = subprocess.run([
+            whisper_cli_path,
+            '-m', model_path,
+            '-f', tmp_path,
+            '--output-txt'
+        ], capture_output=True, text=True)
+        
+        # Clean up temp file
+        Path(tmp_path).unlink(missing_ok=True)
+        
+        if result.returncode == 0:
+            # Extract text from stdout
+            text = result.stdout.strip()
+            # Remove file path prefix that whisper-cli adds
+            if text.startswith(tmp_path):
+                text = text[len(tmp_path):].strip()
+            return text if text else None
         else:
-            text = str(result).strip()
-        
-        return text if text else None
+            print(f"Whisper CLI error: {result.stderr}")
+            return None
         
     except Exception as e:
         print(f"Error processing audio: {e}")
@@ -132,34 +151,41 @@ def audio_callback(indata, frames, time, status):
 
 def main():
     """Main application loop."""
-    global whisper_model, running
+    global running
     
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="Real-Time Voice-to-Mermaid Pipeline")
     parser.add_argument("--input", help="Input WAV file (instead of microphone)")
     parser.add_argument("--model", help="Path to whisper model", 
                        default="whisper.cpp/models/ggml-tiny.en.bin")
+    parser.add_argument("--whisper-cli", help="Path to whisper CLI executable",
+                       default="whisper.cpp/build/bin/whisper-cli")
     args = parser.parse_args()
     
     # Set up signal handling
     signal.signal(signal.SIGINT, signal_handler)
     
-    # Load whisper model
+    # Check whisper CLI
+    whisper_cli_path = Path(args.whisper_cli)
+    if not whisper_cli_path.exists():
+        print(f"ERROR: Whisper CLI not found: {whisper_cli_path}")
+        print("Please build whisper.cpp first:")
+        print("  cd whisper.cpp && mkdir build && cd build")
+        print("  cmake .. -DCMAKE_BUILD_TYPE=Release")
+        print("  cmake --build . --config Release")
+        sys.exit(1)
+    
+    # Check whisper model
     model_path = Path(args.model)
     if not model_path.exists():
         print(f"ERROR: Model file not found: {model_path}")
         print("Please download the model using:")
-        print("  cd whisper.cpp && python models/download-ggml-model.py tiny.en")
+        print("  cd whisper.cpp && bash models/download-ggml-model.sh tiny.en")
         sys.exit(1)
     
-    print(f"Loading whisper model: {model_path}")
-    try:
-        whisper_model = wc.Whisper(str(model_path))
-    except Exception as e:
-        print(f"ERROR: Failed to load whisper model: {e}")
-        sys.exit(1)
-    
-    print("Model loaded successfully!")
+    print(f"Using whisper CLI: {whisper_cli_path}")
+    print(f"Using whisper model: {model_path}")
+    print("Setup complete!")
     
     # Handle file input vs microphone
     if args.input:
@@ -196,7 +222,7 @@ def main():
                             process_buffer = audio_buffer[:buffer_index].copy()
                         
                         # Process through whisper
-                        transcript = process_audio_chunk(process_buffer)
+                        transcript = process_audio_chunk(process_buffer, str(whisper_cli_path), str(model_path))
                         
                         if transcript:
                             # Check for diagram commands
