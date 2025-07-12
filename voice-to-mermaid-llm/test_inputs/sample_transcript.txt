@@ -1,0 +1,7 @@
+The user connects to the backend via API and talks to the database.
+
+User Authentication flow starts with login form, then goes to authentication service, which validates credentials with the database, and finally returns a token to the user.
+
+Create a sequence diagram showing how the client calls the payment gateway, the payment gateway processes the payment, and then sends a confirmation back to the client.
+
+Draw a flowchart where data flows from sensors to data processing unit, then to analytics engine, and finally to the dashboard.
