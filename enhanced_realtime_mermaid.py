@@ -37,7 +37,7 @@ WAKE_WORDS = ["computer", "hey pbm", "hey pvm", "pbm", "pvm", "ppm"]
 WAKE_WORD_TIMEOUT = 10.0
 
 # Paths
-WHISPER_CLI = 'whisper.cpp/build/bin/whisper-cli'
+WHISPER_CLI = 'whisper.cpp/build/bin/Release/main.exe'
 WHISPER_MODEL = 'whisper.cpp/models/ggml-base.en-q5_1.bin'
 
 # LLaMA Configuration

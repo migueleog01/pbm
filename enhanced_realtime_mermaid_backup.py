@@ -34,7 +34,7 @@ CHUNK_DURATION = 3.0
 SILENCE_THRESHOLD = 0.005
 
 # Enhanced pipeline configuration
-WHISPER_CLI = 'whisper.cpp/build/bin/whisper-cli'
+WHISPER_CLI = 'whisper.cpp/build/bin/Release/main.exe'
 WHISPER_MODEL = 'whisper.cpp/models/ggml-base.en-q5_1.bin'
 LLAMA_MODEL = 'voice-to-mermaid-llm/models/llama-v3.1-8b-instruct.Q4_K_M.gguf'
 

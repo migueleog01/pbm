@@ -2,13 +2,14 @@
 """
 LLaMA-powered Text-to-Mermaid Converter
 Converts natural language descriptions into Mermaid diagrams using LLaMA v3.1 8B Instruct
-Optimized for Apple Silicon (M1/M2/M3) with Metal backend acceleration
+Cross-platform optimized for Apple Silicon (M1/M2/M3) and Windows AMD64
 """
 
 import argparse
 import os
 import sys
 import time
+import platform
 from pathlib import Path
 from typing import Optional
 
@@ -16,21 +17,46 @@ try:
     from llama_cpp import Llama
 except ImportError:
     print("❌ llama-cpp-python not installed!")
-    print("Install with: CMAKE_ARGS='-DLLAMA_METAL=on' pip install llama-cpp-python --force-reinstall --no-cache-dir")
+    print("Install with: pip install llama-cpp-python")
     sys.exit(1)
 
-# Configuration for optimal M1/M2/M3 performance
+# Configuration for optimal performance
 DEFAULT_MODEL_PATH = "models/llama-v3.1-8b-instruct.Q4_K_M.gguf"
-OPTIMAL_THREADS = 8  # Adjust based on your Mac's performance cores
-CONTEXT_SIZE = 2048  # Sufficient for most diagram descriptions
-MAX_TOKENS = 512     # Enough for complex Mermaid diagrams
-TEMPERATURE = 0.3    # Lower temperature for more consistent diagram output
+
+# Platform-specific settings
+IS_WINDOWS = platform.system() == "Windows"
+IS_MAC = platform.system() == "Darwin"
+
+if IS_WINDOWS:
+    OPTIMAL_THREADS = 4        # Conservative for Windows
+    CONTEXT_SIZE = 1024        # Smaller context for stability
+    USE_MLOCK = False          # Disable memory locking on Windows
+    USE_METAL = False          # No Metal on Windows
+    N_GPU_LAYERS = 0           # CPU only for stability
+    print("🪟 Windows detected - using CPU-optimized settings")
+elif IS_MAC:
+    OPTIMAL_THREADS = 8        # Adjust based on your Mac's performance cores
+    CONTEXT_SIZE = 2048        # Sufficient for most diagram descriptions
+    USE_MLOCK = True           # Enable memory locking on Mac
+    USE_METAL = True           # Enable Metal backend on Mac
+    N_GPU_LAYERS = -1          # Use all GPU layers on Mac
+    print("🍎 macOS detected - using Metal-optimized settings")
+else:
+    OPTIMAL_THREADS = 6        # Default for Linux
+    CONTEXT_SIZE = 2048
+    USE_MLOCK = False
+    USE_METAL = False
+    N_GPU_LAYERS = 0
+    print("🐧 Linux detected - using CPU-optimized settings")
+
+MAX_TOKENS = 512               # Enough for complex Mermaid diagrams
+TEMPERATURE = 0.3              # Lower temperature for more consistent diagram output
 
 class LlamaMermaidConverter:
     """Converts text descriptions to Mermaid diagrams using LLaMA v3.1 8B Instruct."""
     
     def __init__(self, model_path: str, verbose: bool = False):
-        """Initialize the LLaMA model with optimal settings for Apple Silicon."""
+        """Initialize the LLaMA model with platform-optimized settings."""
         self.model_path = Path(model_path)
         self.verbose = verbose
         
@@ -38,25 +64,37 @@ class LlamaMermaidConverter:
             raise FileNotFoundError(f"Model file not found: {model_path}")
         
         print(f"🧠 Loading LLaMA v3.1 8B Instruct from {model_path}")
-        print("⚡ Optimized for Apple Silicon with Metal backend")
+        print(f"⚡ Platform: {platform.system()} {platform.machine()}")
         
         try:
-            # Initialize LLaMA with Metal acceleration and optimal settings
-            self.llm = Llama(
-                model_path=str(self.model_path),
-                n_ctx=CONTEXT_SIZE,           # Context window
-                n_threads=OPTIMAL_THREADS,    # CPU threads (adjust for your Mac)
-                n_gpu_layers=-1,              # Use all GPU layers (Metal)
-                use_mlock=True,               # Lock model in memory
-                verbose=self.verbose,
-                # Metal-specific optimizations
-                metal=True,                   # Enable Metal backend
-                f16_kv=True,                  # Use f16 for key/value cache
-            )
-            print("✅ LLaMA model loaded successfully with Metal acceleration!")
+            # Initialize LLaMA with platform-optimized settings
+            llama_config = {
+                "model_path": str(self.model_path),
+                "n_ctx": CONTEXT_SIZE,
+                "n_threads": OPTIMAL_THREADS,
+                "n_gpu_layers": N_GPU_LAYERS,
+                "use_mlock": USE_MLOCK,
+                "verbose": self.verbose,
+                "f16_kv": True,  # Use f16 for key/value cache (works on all platforms)
+            }
             
+            # Add Metal backend only on macOS
+            if IS_MAC and USE_METAL:
+                llama_config["metal"] = True
+                print("🚀 Metal backend enabled")
+            
+            self.llm = Llama(**llama_config)
+            
+            if IS_WINDOWS:
+                print("✅ LLaMA model loaded successfully with Windows CPU optimization!")
+            elif IS_MAC:
+                print("✅ LLaMA model loaded successfully with Metal acceleration!")
+            else:
+                print("✅ LLaMA model loaded successfully with CPU optimization!")
+                
         except Exception as e:
             print(f"❌ Failed to load LLaMA model: {e}")
+            print(f"💡 Try reducing n_threads to {OPTIMAL_THREADS//2} or disable f16_kv")
             raise
     
     def create_prompt(self, text: str) -> str:
@@ -100,7 +138,7 @@ Convert this description into a Mermaid diagram:
         return prompt
     
     def generate_mermaid(self, text: str) -> Optional[str]:
-        """Generate Mermaid diagram from text description."""
+        """Generate Mermaid diagram from text description with timeout protection."""
         if not text.strip():
             return None
         
@@ -111,17 +149,65 @@ Convert this description into a Mermaid diagram:
         try:
             start_time = time.time()
             
-            # Generate response with optimal settings
-            response = self.llm(
-                prompt,
-                max_tokens=MAX_TOKENS,
-                temperature=TEMPERATURE,
-                top_p=0.9,
-                top_k=40,
-                repeat_penalty=1.1,
-                stop=["<|eot_id|>", "<|end_of_text|>"],  # Stop tokens for LLaMA v3.1
-                echo=False  # Don't echo the prompt
-            )
+            # Windows-specific timeout protection
+            if IS_WINDOWS:
+                import threading
+                import queue
+                
+                result_queue = queue.Queue()
+                
+                def generate_with_timeout():
+                    try:
+                        response = self.llm(
+                            prompt,
+                            max_tokens=MAX_TOKENS,
+                            temperature=TEMPERATURE,
+                            top_p=0.9,
+                            top_k=40,
+                            repeat_penalty=1.1,
+                            stop=["<|eot_id|>", "<|end_of_text|>"],
+                            echo=False
+                        )
+                        result_queue.put(('success', response))
+                    except Exception as e:
+                        result_queue.put(('error', str(e)))
+                
+                # Start generation in a separate thread
+                thread = threading.Thread(target=generate_with_timeout)
+                thread.daemon = True
+                thread.start()
+                
+                # Wait for result with timeout
+                thread.join(timeout=30)  # 30-second timeout
+                
+                if thread.is_alive():
+                    print("⏰ Generation timed out after 30 seconds")
+                    return None
+                
+                if result_queue.empty():
+                    print("❌ Generation failed - no response")
+                    return None
+                
+                result_type, result_data = result_queue.get()
+                
+                if result_type == 'error':
+                    print(f"❌ Generation error: {result_data}")
+                    return None
+                
+                response = result_data
+                
+            else:
+                # Direct generation for Mac/Linux
+                response = self.llm(
+                    prompt,
+                    max_tokens=MAX_TOKENS,
+                    temperature=TEMPERATURE,
+                    top_p=0.9,
+                    top_k=40,
+                    repeat_penalty=1.1,
+                    stop=["<|eot_id|>", "<|end_of_text|>"],
+                    echo=False
+                )
             
             end_time = time.time()
             

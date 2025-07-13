@@ -12,6 +12,7 @@ import sys
 import subprocess
 import threading
 import time
+import platform
 from datetime import datetime
 
 app = Flask(__name__)
@@ -19,6 +20,22 @@ CORS(app, origins="*", allow_headers=["Content-Type"], methods=["GET", "POST", "
 
 # Add parent directory to path to import the voice-to-mermaid system
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Platform detection
+IS_WINDOWS = platform.system() == "Windows"
+IS_MAC = platform.system() == "Darwin"
+
+# Windows-specific configuration
+if IS_WINDOWS:
+    # Disable LLaMA by default on Windows to prevent hanging
+    # Set environment variable ENABLE_LLAMA_WINDOWS=1 to enable
+    ENABLE_LLAMA_ON_WINDOWS = os.environ.get('ENABLE_LLAMA_WINDOWS', '0') == '1'
+    if ENABLE_LLAMA_ON_WINDOWS:
+        print("🪟 Windows: LLaMA enabled via ENABLE_LLAMA_WINDOWS environment variable")
+    else:
+        print("🪟 Windows: LLaMA disabled by default (set ENABLE_LLAMA_WINDOWS=1 to enable)")
+else:
+    ENABLE_LLAMA_ON_WINDOWS = True  # Always enabled on non-Windows platforms
 
 # Global variable to track the voice-to-mermaid process
 voice_process = None
@@ -30,6 +47,11 @@ llama_converter = None
 def initialize_llama():
     """Initialize the LLaMA converter for diagram generation"""
     global llama_converter
+    
+    # Skip LLaMA initialization on Windows unless explicitly enabled
+    if IS_WINDOWS and not ENABLE_LLAMA_ON_WINDOWS:
+        print("🪟 Skipping LLaMA initialization on Windows (use simple fallback)")
+        return None
     
     if llama_converter is not None:
         return llama_converter
@@ -61,6 +83,8 @@ def initialize_llama():
         
     except Exception as e:
         print(f"❌ Failed to initialize LLaMA converter: {str(e)}")
+        if IS_WINDOWS:
+            print("💡 Windows users: This is normal. Using simple fallback instead.")
         return None
 
 def start_voice_to_mermaid():
@@ -277,42 +301,126 @@ def generate_diagram():
         }), 500
 
 def generate_simple_diagram(description):
-    """Simple fallback diagram generation without LLaMA"""
+    """Enhanced fallback diagram generation without LLaMA"""
     description_lower = description.lower()
     
-    # Simple keyword-based diagram generation
-    if any(word in description_lower for word in ['login', 'user', 'authentication', 'password']):
+    # Enhanced keyword-based diagram generation
+    if any(word in description_lower for word in ['login', 'user', 'authentication', 'password', 'signin']):
         return """graph TD
     A[User] --> B[Login Form]
     B --> C[Validate Credentials]
     C --> D[Access Granted]
-    C --> E[Access Denied]"""
+    C --> E[Access Denied]
+    D --> F[Dashboard]
+    E --> B"""
     
-    elif any(word in description_lower for word in ['payment', 'money', 'transaction', 'pay']):
+    elif any(word in description_lower for word in ['payment', 'money', 'transaction', 'pay', 'checkout']):
         return """graph TD
-    A[User] --> B[Payment Gateway]
-    B --> C[Process Payment]
-    C --> D[Payment Success]
-    C --> E[Payment Failed]"""
+    A[User] --> B[Shopping Cart]
+    B --> C[Payment Gateway]
+    C --> D[Process Payment]
+    D --> E[Payment Success]
+    D --> F[Payment Failed]
+    E --> G[Order Confirmation]
+    F --> C"""
     
-    elif any(word in description_lower for word in ['api', 'request', 'response', 'server']):
+    elif any(word in description_lower for word in ['api', 'request', 'response', 'server', 'endpoint']):
         return """graph TD
     A[Client] --> B[API Request]
     B --> C[Server Processing]
-    C --> D[API Response]
+    C --> D[Database Query]
+    D --> E[API Response]
+    E --> A"""
+    
+    elif any(word in description_lower for word in ['database', 'data', 'query', 'sql']):
+        return """graph TD
+    A[Application] --> B[Database Query]
+    B --> C[Execute Query]
+    C --> D[Return Results]
     D --> A"""
     
-    else:
-        # Generic flowchart
+    elif any(word in description_lower for word in ['upload', 'download', 'file', 'document']):
+        return """graph TD
+    A[User] --> B[Select File]
+    B --> C[Upload File]
+    C --> D[Process File]
+    D --> E[Save to Storage]
+    E --> F[Confirm Success]"""
+    
+    elif any(word in description_lower for word in ['register', 'signup', 'account', 'create']):
+        return """graph TD
+    A[User] --> B[Registration Form]
+    B --> C[Validate Input]
+    C --> D[Create Account]
+    C --> E[Show Errors]
+    D --> F[Send Confirmation]
+    E --> B"""
+    
+    # Try to extract process steps from description
+    elif any(word in description_lower for word in ['workflow', 'process', 'step', 'flow', 'then', 'next']):
         words = description.split()
-        if len(words) >= 3:
-            return f"""graph TD
-    A[{words[0].title()}] --> B[{' '.join(words[1:3]).title()}]
-    B --> C[{words[-1].title() if len(words) > 3 else 'Complete'}]"""
-        else:
-            return f"""graph TD
-    A[Start] --> B[{description.title()}]
-    B --> C[End]"""
+        steps = []
+        
+        # Look for common process words
+        process_words = ['start', 'begin', 'process', 'check', 'validate', 'send', 'receive', 'end', 'finish', 'complete']
+        for word in words:
+            clean_word = word.strip('.,!?;:').lower()
+            if clean_word in process_words:
+                steps.append(word.title())
+        
+        if len(steps) >= 2:
+            diagram = "graph TD\n"
+            for i, step in enumerate(steps[:5]):  # Limit to 5 steps
+                letter = chr(65 + i)  # A, B, C, etc.
+                diagram += f"    {letter}[{step}]"
+                if i < len(steps) - 1:
+                    next_letter = chr(65 + i + 1)
+                    diagram += f" --> {next_letter}"
+                diagram += "\n"
+            return diagram.strip()
+    
+    # Generic flowchart based on description analysis
+    words = [word.strip('.,!?;:') for word in description.split()]
+    
+    if len(words) >= 3:
+        # Try to create a meaningful flow from the words
+        start_word = words[0].title()
+        
+        # Find connecting words that suggest flow
+        connecting_words = ['to', 'then', 'and', 'with', 'through', 'via', 'using']
+        flow_parts = []
+        current_part = [start_word]
+        
+        for word in words[1:]:
+            if word.lower() in connecting_words:
+                if current_part:
+                    flow_parts.append(' '.join(current_part))
+                    current_part = []
+            else:
+                current_part.append(word.title())
+        
+        if current_part:
+            flow_parts.append(' '.join(current_part))
+        
+        if len(flow_parts) >= 2:
+            diagram = "graph TD\n"
+            for i, part in enumerate(flow_parts[:5]):  # Limit to 5 parts
+                letter = chr(65 + i)
+                diagram += f"    {letter}[{part}]"
+                if i < len(flow_parts) - 1:
+                    next_letter = chr(65 + i + 1)
+                    diagram += f" --> {next_letter}"
+                diagram += "\n"
+            return diagram.strip()
+    
+    # Final fallback - simple generic diagram
+    return """graph TD
+    A[Start] --> B[Process]
+    B --> C[Decision]
+    C --> D[Success]
+    C --> E[Retry]
+    E --> B
+    D --> F[End]"""
 
 @app.route('/status', methods=['GET'])
 def get_status():
