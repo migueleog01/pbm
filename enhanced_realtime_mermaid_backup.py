@@ -154,6 +154,61 @@ def should_generate_diagram(text: str) -> bool:
     # Be more permissive - if it has connections or actions, try LLaMA
     return has_diagram or has_action or has_connection
 
+def generate_mindmap_from_speech(text: str) -> str:
+    """
+    Convert a transcript into a Mermaid mindmap code block.
+    - The first line is 'mindmap'
+    - Use indentation for hierarchy
+    - Use simple heuristics to extract main topic, subtopics, and details
+    - Optionally use shapes if relevant
+    """
+    if not text or not text.strip():
+        return """```mermaid\nmindmap\n    (No content to summarize)\n```"""
+
+    # Simple heuristic: first sentence/phrase is the root, next are branches
+    # Split by sentences or semicolons/periods
+    sentences = re.split(r'[.;\n]', text)
+    sentences = [s.strip() for s in sentences if s.strip()]
+    if not sentences:
+        return """```mermaid\nmindmap\n    (No content to summarize)\n```"""
+
+    root = sentences[0]
+    branches = sentences[1:]
+
+    # Further split branches by common conjunctions (and, then, etc.)
+    mindmap_lines = ["mindmap", f"    {root}"]
+    for branch in branches:
+        # Try to extract sub-branches
+        # e.g. "First, do A and B and C" -> [A, B, C]
+        sub_branches = re.split(r'\band\b|\bthen\b|,|:', branch)
+        sub_branches = [sb.strip() for sb in sub_branches if sb.strip()]
+        if len(sub_branches) > 1:
+            # First part is the branch, rest are sub-branches
+            mindmap_lines.append(f"        {sub_branches[0]}")
+            for sub in sub_branches[1:]:
+                mindmap_lines.append(f"            {sub}")
+        elif len(sub_branches) == 1:
+            mindmap_lines.append(f"        {sub_branches[0]}")
+
+    # Optionally, add shapes (e.g., square, rounded) based on keywords
+    # For demo, if a branch contains 'decision', use square; if 'note', use rounded
+    for i, line in enumerate(mindmap_lines):
+        if 'decision' in line.lower():
+            mindmap_lines[i] = line.replace('decision', '((Decision))')
+        if 'note' in line.lower():
+            mindmap_lines[i] = line.replace('note', '((Note))')
+
+    mindmap_code = '\n'.join(mindmap_lines)
+    return f"""```mermaid\n{mindmap_code}\n```"""
+
+def process_and_write_mindmap(transcript: str):
+    mindmap = generate_mindmap_from_speech(transcript)
+    output_path = os.path.join(os.path.dirname(__file__), "RenderMermaid", "whisper_output.txt")
+    with open(output_path, "w") as f:
+        f.write(mindmap)
+    print("\n=== GENERATED MERMAID MINDMAP ===\n")
+    print(mindmap)
+
 class EnhancedRealTimeTranscriber:
     """Enhanced transcriber with LLaMA integration."""
     

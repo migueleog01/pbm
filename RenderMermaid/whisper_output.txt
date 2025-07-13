@@ -1,4 +1,9 @@
 ```mermaid
-graph TD
-    User[User] --> Database[Database]
+mindmap
+    token
+        Concepts
+            token
+                think
+        Categories
+            decoding
 ```
