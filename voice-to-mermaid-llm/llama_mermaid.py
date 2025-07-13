@@ -12,6 +12,11 @@ import time
 from pathlib import Path
 from typing import Optional
 
+
+# Import the HTML rendering function
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", "RenderMermaid"))
+from render_flowchart import render_mermaid_html
+
 try:
     from llama_cpp import Llama
 except ImportError:
@@ -21,10 +26,10 @@ except ImportError:
 
 # Configuration for optimal M1/M2/M3 performance
 DEFAULT_MODEL_PATH = "models/llama-v3.1-8b-instruct.Q4_K_M.gguf"
-OPTIMAL_THREADS = 8  # Adjust based on your Mac's performance cores
-CONTEXT_SIZE = 2048  # Sufficient for most diagram descriptions
-MAX_TOKENS = 512     # Enough for complex Mermaid diagrams
-TEMPERATURE = 0.3    # Lower temperature for more consistent diagram output
+OPTIMAL_THREADS = 4  # Reduced from 8 to avoid overload
+CONTEXT_SIZE = 1024  # Reduced from 2048 to avoid memory issues
+MAX_TOKENS = 256     # Reduced from 512 for simpler outputs
+TEMPERATURE = 0.1    # Lower temperature for more consistent output
 
 class LlamaMermaidConverter:
     """Converts text descriptions to Mermaid diagrams using LLaMA v3.1 8B Instruct."""
@@ -41,19 +46,19 @@ class LlamaMermaidConverter:
         print("⚡ Optimized for Apple Silicon with Metal backend")
         
         try:
-            # Initialize LLaMA with Metal acceleration and optimal settings
+            # Initialize LLaMA with conservative settings to avoid decoding errors
             self.llm = Llama(
                 model_path=str(self.model_path),
-                n_ctx=CONTEXT_SIZE,           # Context window
-                n_threads=OPTIMAL_THREADS,    # CPU threads (adjust for your Mac)
-                n_gpu_layers=-1,              # Use all GPU layers (Metal)
-                use_mlock=True,               # Lock model in memory
+                n_ctx=1024,           # Reduced context window
+                n_threads=4,          # Fewer threads
+                n_gpu_layers=0,       # CPU only to avoid GPU issues
+                use_mlock=False,      # Don't lock memory
                 verbose=self.verbose,
-                # Metal-specific optimizations
-                metal=True,                   # Enable Metal backend
-                f16_kv=True,                  # Use f16 for key/value cache
+                # Disable Metal to avoid decoding issues
+                metal=False,           # Disable Metal backend
+                f16_kv=False,         # Use f32 for key/value cache
             )
-            print("✅ LLaMA model loaded successfully with Metal acceleration!")
+            print("✅ LLaMA model loaded successfully with CPU-only mode!")
             
         except Exception as e:
             print(f"❌ Failed to load LLaMA model: {e}")
@@ -62,40 +67,28 @@ class LlamaMermaidConverter:
     def create_prompt(self, text: str) -> str:
         """Create a well-structured prompt for LLaMA v3.1 8B Instruct."""
         
-        # LLaMA v3.1 Instruct format with system instruction
-        system_prompt = """You are a diagram assistant specialized in converting natural language descriptions into valid Mermaid.js diagrams.
+        # Simplified system prompt for better compatibility
+        system_prompt = """You are a diagram assistant. Convert natural language descriptions into valid Mermaid diagrams.
 
 Rules:
-1. Output ONLY valid Mermaid syntax - no explanations, no code blocks, no additional text
-2. Choose the most appropriate diagram type (graph, sequenceDiagram, mindmap, etc.)
-3. Use clear, descriptive node names
-4. For flowcharts, use 'graph TD' (top-down) or 'graph LR' (left-right)
-5. For sequence diagrams, use 'sequenceDiagram' format
-6. For mindmaps, use 'mindmap' format
-7. Keep diagrams simple and readable
+1. Output ONLY valid Mermaid syntax - no explanations or code blocks
+2. Use 'graph TD' for flowcharts
+3. Use clear node names
+4. Keep diagrams simple
+5. Feel free to use looping or bidirectional arrows when appropriate, according to the context.
 
 Examples:
 Input: "User logs in and accesses dashboard"
 Output: graph TD
     User[User] --> Login[Login]
-    Login --> Dashboard[Dashboard]
+    Login --> Dashboard[Dashboard]"""
 
-Input: "Client calls API then API queries database"
-Output: sequenceDiagram
-    Client->>API: Request
-    API->>Database: Query
-    Database-->>API: Response
-    API-->>Client: Response"""
+        # Use a simpler format without special tokens that cause decoding errors
+        prompt = f"""{system_prompt}
 
-        # Format the prompt for LLaMA v3.1 Instruct
-        prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+Convert to Mermaid diagram: {text.strip()}
 
-{system_prompt}<|eot_id|><|start_header_id|>user<|end_header_id|>
-
-Convert this description into a Mermaid diagram:
-{text.strip()}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
-
-"""
+Mermaid diagram:"""
         
         return prompt
     
@@ -114,12 +107,12 @@ Convert this description into a Mermaid diagram:
             # Generate response with optimal settings
             response = self.llm(
                 prompt,
-                max_tokens=MAX_TOKENS,
-                temperature=TEMPERATURE,
+                max_tokens=256,      # Reduced for simpler outputs
+                temperature=0.1,     # Lower temperature for consistency
                 top_p=0.9,
                 top_k=40,
                 repeat_penalty=1.1,
-                stop=["<|eot_id|>", "<|end_of_text|>"],  # Stop tokens for LLaMA v3.1
+                stop=["\n\n", "```", "Description:", "Mermaid diagram:"],  # Simpler stop tokens
                 echo=False  # Don't echo the prompt
             )
             
@@ -133,6 +126,10 @@ Convert this description into a Mermaid diagram:
             
             if mermaid_code:
                 print(f"⚡ Generated in {end_time - start_time:.2f}s")
+                
+                # Write to whisper_output.txt and render HTML
+                self.write_to_whisper_output_and_render(mermaid_code)
+                
                 return mermaid_code
             else:
                 print("❌ Failed to generate valid Mermaid code")
@@ -172,6 +169,33 @@ Convert this description into a Mermaid diagram:
         
         return text
     
+    def write_to_whisper_output_and_render(self, mermaid_code: str) -> None:
+        """Write LLaMA output to whisper_output.txt and render HTML diagram."""
+        if not mermaid_code:
+            print("❌ No Mermaid code to write")
+            return
+        
+        # Path to whisper_output.txt
+        whisper_output_path = os.path.join(os.path.dirname(__file__), "..", "RenderMermaid", "whisper_output.txt")
+        
+        try:
+            # Write raw Mermaid code to whisper_output.txt
+            with open(whisper_output_path, "w") as f:
+                f.write(mermaid_code)
+            
+            print(f"✅ Written LLaMA output to: {whisper_output_path}")
+            print(f"📄 Content length: {len(mermaid_code)} characters")
+            
+            # Render HTML diagram
+            print("🎨 Rendering HTML diagram...")
+            render_mermaid_html()
+            
+            print("✅ HTML diagram updated!")
+            print(f"🌐 Open: {os.path.join(os.path.dirname(__file__), '..', 'RenderMermaid', 'diagram.html')}")
+            
+        except Exception as e:
+            print(f"❌ Error writing to whisper_output.txt: {e}")
+    
     def process_file(self, input_file: str) -> None:
         """Process a file with multiple text descriptions."""
         input_path = Path(input_file)
@@ -191,6 +215,7 @@ Convert this description into a Mermaid diagram:
             
             print(f"📝 Found {len(descriptions)} descriptions to process")
             
+            last_mermaid_code = None
             for i, description in enumerate(descriptions, 1):
                 print(f"\n--- Description {i}/{len(descriptions)} ---")
                 mermaid_code = self.generate_mermaid(description)
@@ -200,10 +225,16 @@ Convert this description into a Mermaid diagram:
                     print("```mermaid")
                     print(mermaid_code)
                     print("```")
+                    last_mermaid_code = mermaid_code
                 else:
                     print("❌ Failed to generate diagram")
                 
                 print("-" * 60)
+            
+            # Write the last successful diagram to whisper_output.txt
+            if last_mermaid_code:
+                print(f"\n📝 Writing last diagram to whisper_output.txt...")
+                self.write_to_whisper_output_and_render(last_mermaid_code)
             
         except Exception as e:
             print(f"❌ Error processing file: {e}")

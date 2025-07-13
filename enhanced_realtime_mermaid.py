@@ -23,6 +23,7 @@ import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), "RenderMermaid"))
 from render_flowchart import render_mermaid_html
 
+
 # Try to import LLaMA converter
 try:
     sys.path.append('voice-to-mermaid-llm')
@@ -269,6 +270,10 @@ class EnhancedTranscriber:
     def __init__(self):
         self.audio_buffer = []
         self.buffer_duration = 0.0
+        self.accumulated_transcripts = []
+        self.last_activity_time = time.time()
+        self.is_processing = False
+        self.inactivity_timeout = 5.0  # 5 seconds of silence before processing
         
         # Check setup
         if not Path(WHISPER_CLI).exists():
@@ -288,6 +293,40 @@ class EnhancedTranscriber:
         
         signal.signal(signal.SIGINT, signal_handler)
         print("✅ Enhanced voice-to-Mermaid pipeline ready!")
+    
+    def process_accumulated_speech(self):
+        """Process accumulated transcripts after inactivity timeout."""
+        if not self.accumulated_transcripts:
+            return
+        
+        # Combine all transcripts
+        full_text = " ".join(self.accumulated_transcripts)
+        print(f"\n📝 Processing accumulated speech ({len(self.accumulated_transcripts)} segments):")
+        print(f"Full text: {full_text}")
+        
+        # Process with wake word detection
+        mermaid_result = self.process_transcript(full_text)
+        
+        if mermaid_result and mermaid_result != "WAKE_WORD_ONLY":
+            print("\n🎯 MERMAID DIAGRAM GENERATED:")
+            print("```mermaid")
+            print(mermaid_result)
+            print("```\n")
+            
+            output_path = os.path.join(os.path.dirname(__file__), "RenderMermaid", "whisper_output.txt")
+            with open(output_path, "w") as f:
+                f.write(f"```mermaid\n{mermaid_result}\n```")
+                print("TEXT WRITTEN TO WHISPER_OUTPUT.TXT FILE!")
+            
+            render_mermaid_html()
+        elif mermaid_result == "WAKE_WORD_ONLY":
+            print("🔄 Wake word detected, waiting for diagram command...")
+        else:
+            print("💬 No diagram command detected")
+        
+        # Reset for next session
+        self.accumulated_transcripts = []
+        self.is_processing = False
     
     def process_transcript(self, text: str) -> Optional[str]:
         """Process transcript with wake word detection."""
@@ -321,7 +360,7 @@ class EnhancedTranscriber:
         return None
     
     def audio_callback(self, indata, frames, time_info, status):
-        """Handle audio input."""
+        """Handle audio input with accumulation and inactivity timeout."""
         global running, listening_for_command, wake_word_detected_time
         
         if not running:
@@ -343,28 +382,26 @@ class EnhancedTranscriber:
             rms = calculate_rms(full_audio)
             
             if rms > SILENCE_THRESHOLD:
+                # Speech detected - update activity time
+                self.last_activity_time = time.time()
+                
+                # Transcribe
                 result = transcribe_with_whisper(full_audio)
                 if result:
                     text, inference_time = result
                     status_icon = "👂" if listening_for_command else "🎤"
                     print(f"{status_icon} Whisper ({inference_time:.2f}s): {text}")
                     
-                    mermaid_result = self.process_transcript(text)
-                    if mermaid_result == "WAKE_WORD_ONLY":
-                        print("🔄 Ready for diagram command...")
-                    elif mermaid_result:
-                        print("\n🎯 MERMAID DIAGRAM GENERATED:")
-                        print("```mermaid")
-                        print(mermaid_result)
-                        print("```\n")
-                        output_path = os.path.join(os.path.dirname(__file__), "RenderMermaid", "whisper_output.txt")
-                        with open(output_path, "w") as f:
-                            f.write(f"```mermaid\n{mermaid_result}\n```")
-                            print("TEXT WRITTEN TO WHISPER_OUTPUT.TXT FILE!")
-                        
-                        render_mermaid_html()
-                    elif not listening_for_command:
-                        print("💬 Say 'Computer' followed by a diagram command")
+                    # Accumulate transcript
+                    self.accumulated_transcripts.append(text)
+                    self.is_processing = False
+            else:
+                # Silence detected - check for inactivity timeout
+                if (time.time() - self.last_activity_time > self.inactivity_timeout and 
+                    self.accumulated_transcripts and not self.is_processing):
+                    self.is_processing = True
+                    print(f"\n⏰ {self.inactivity_timeout}s of inactivity detected. Processing accumulated speech...")
+                    self.process_accumulated_speech()
             
             # Reset buffer
             self.audio_buffer = []
@@ -375,15 +412,18 @@ class EnhancedTranscriber:
         print("🎤 Enhanced Voice-to-Mermaid Pipeline with Wake Word Detection")
         print("🧠 Whisper.cpp for speech recognition")
         print("🎨 Smart content-aware diagram generation")
+        print("⏰ 5-second inactivity timeout for complete sentences")
         
         print("\n🔥 NEW FEATURES:")
         print("   🎯 Wake Word Detection: Say 'Computer' first!")
         print("   🎨 Smart Content Parsing: Uses your actual words!")
+        print("   ⏰ Inactivity Timeout: Waits 5s after you finish speaking!")
         
         print("\n💡 How to use:")
         print("   1. Say: 'Computer'")
-        print("   2. Then: 'Draw user to database'")
-        print("   3. Or: 'Computer, create login to dashboard'")
+        print("   2. Then: Speak your complete diagram description")
+        print("   3. Wait 5 seconds after finishing")
+        print("   4. Or: 'Computer, create login to dashboard'")
         
         print("\n📝 Example commands:")
         print("   • 'Computer, draw user to database'")
@@ -391,7 +431,8 @@ class EnhancedTranscriber:
         print("   • 'Computer, show payment to confirmation'")
         print("   • 'Computer, make authentication then success'")
         
-        print("\nPress Ctrl+C to stop")
+        print("\n⏰ Inactivity timeout: 5 seconds")
+        print("Press Ctrl+C to stop")
         print("👂 Listening for 'Computer'...")
         
         with sd.InputStream(
@@ -405,6 +446,10 @@ class EnhancedTranscriber:
                 while running:
                     time.sleep(0.1)
             except KeyboardInterrupt:
+                # Process any remaining speech before exiting
+                if self.accumulated_transcripts:
+                    print("\n🔄 Processing remaining speech before exit...")
+                    self.process_accumulated_speech()
                 pass
         
         print("✅ Enhanced pipeline stopped")

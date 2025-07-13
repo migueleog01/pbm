@@ -1,9 +1,9 @@
 ```mermaid
-mindmap
-    token
-        Concepts
-            token
-                think
-        Categories
-            decoding
+graph TD
+    Client[Client] --> Requirements[Requirements]
+    Requirements --> Design[Design]
+    Design --> Implementation[Implementation]
+    Implementation --> Testing[Testing]
+    Testing --> Deployment[Deployment]
+    Deployment --> Monitoring[Monitoring]
 ```
