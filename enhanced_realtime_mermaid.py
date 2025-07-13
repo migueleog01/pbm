@@ -18,6 +18,11 @@ from typing import Optional, List, Tuple
 import numpy as np
 import sounddevice as sd
 
+import os
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), "RenderMermaid"))
+from render_flowchart import render_mermaid_html
+
 # Configuration
 SAMPLE_RATE = 16000
 CHUNK_DURATION = 3.0
@@ -252,6 +257,12 @@ class EnhancedTranscriber:
                         print("```mermaid")
                         print(mermaid_result)
                         print("```\n")
+                        output_path = os.path.join(os.path.dirname(__file__), "RenderMermaid", "whisper_output.txt")
+                        with open(output_path, "w") as f:
+                            f.write(f"```mermaid\n{mermaid_result}\n```")
+                            print("TEXT WRITTEN TO WHISPER_OUTPUT.TXT FILE!")
+                        
+                        render_mermaid_html()
                     elif not listening_for_command:
                         print("💬 Say 'Hey PBM' followed by a diagram command")
             

@@ -1,0 +1,23 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Real-Time Mermaid Diagram</title>
+    <style>
+      body { background: #222; color: #eee; font-family: sans-serif; }
+      pre.mermaid { background: #222; color: #eee; }
+    </style>
+  </head>
+  <body>
+    <h2>Real-Time Mermaid Diagram</h2>
+    <pre class="mermaid">
+graph TD
+    User[User] --> Database[Database]
+    </pre>
+    <script type="module">
+      import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+      mermaid.initialize({ startOnLoad: true });
+    </script>
+  </body>
+</html>

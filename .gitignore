@@ -72,3 +72,6 @@ Makefile
 whisper.cpp/build/
 whisper.cpp/Release/
 whisper.cpp/Debug/ 
+
+
+node_modules/
