@@ -1,31 +1,22 @@
 #!/usr/bin/env python3
 """
-Enhanced Voice-to-Mermaid Pipeline with LLaMA Integration
-Real-time speech recognition with wake word detection and LLaMA-powered diagram generation.
+Enhanced Voice-to-Mermaid Pipeline with Wake Word Detection
 """
 
 import argparse
-import signal
+import os
 import sys
-import tempfile
 import time
-import wave
-import subprocess
-import re
 from pathlib import Path
-from typing import Optional, Tuple, List
+import subprocess
+import tempfile
+import wave
+import signal
+import re
+from typing import Optional, List, Tuple
 
 import numpy as np
 import sounddevice as sd
-
-# Try to import LLaMA converter
-try:
-    sys.path.append('voice-to-mermaid-llm')
-    from llama_mermaid import LlamaMermaidConverter
-    LLAMA_AVAILABLE = True
-except ImportError:
-    print("⚠️  LLaMA converter not available - falling back to simple text processing")
-    LLAMA_AVAILABLE = False
 
 # Configuration
 SAMPLE_RATE = 16000
@@ -33,16 +24,12 @@ CHUNK_DURATION = 3.0
 SILENCE_THRESHOLD = 0.005
 
 # Wake word settings
-WAKE_WORDS = ["computer", "hey pbm", "hey pvm", "pbm", "pvm", "ppm"]
+WAKE_WORDS = ["hey pbm", "hey pvm", "pbm", "pvm", "ppm"]
 WAKE_WORD_TIMEOUT = 10.0
 
 # Paths
 WHISPER_CLI = 'whisper.cpp/build/bin/whisper-cli'
 WHISPER_MODEL = 'whisper.cpp/models/ggml-base.en-q5_1.bin'
-
-# LLaMA Configuration
-LLAMA_MODEL = "voice-to-mermaid-llm/models/llama-v3.1-8b-instruct.Q4_K_M.gguf"
-llama_converter = None
 
 # Global state
 running = True
@@ -114,88 +101,8 @@ def extract_nodes_from_speech(text: str) -> Tuple[List[str], List[Tuple[str, str
     
     return list(nodes), connections
 
-def initialize_llama():
-    """Initialize LLaMA converter if available."""
-    global llama_converter
-    
-    if not LLAMA_AVAILABLE:
-        print("📝 LLaMA not available - using simple text processing")
-        return False
-    
-    if not Path(LLAMA_MODEL).exists():
-        print(f"⚠️  LLaMA model not found: {LLAMA_MODEL}")
-        print("📝 Download model first, falling back to simple text processing")
-        return False
-    
-    try:
-        print("🧠 Initializing LLaMA for diagram generation...")
-        llama_converter = LlamaMermaidConverter(LLAMA_MODEL)
-        print("✅ LLaMA ready for intelligent diagram generation!")
-        return True
-    except Exception as e:
-        print(f"❌ Failed to initialize LLaMA: {e}")
-        print("📝 Falling back to simple text processing")
-        return False
-
 def generate_mermaid_from_speech(text: str) -> Optional[str]:
-    """Generate Mermaid diagram from speech using LLaMA or fallback to simple processing."""
-    print(f"🚨 FUNCTION CALLED: '{text}'")
-    
-    # Try LLaMA first if available
-    if llama_converter:
-        print("🧠 Using LLaMA for intelligent diagram generation...")
-        try:
-            result = llama_converter.generate_mermaid(text)
-            if result:
-                print("🚨 LLaMA GENERATED DIAGRAM")
-                return result
-            else:
-                print("⚠️  LLaMA failed, falling back to simple processing")
-        except Exception as e:
-            print(f"❌ LLaMA error: {e}, falling back to simple processing")
-    
-    # Fallback to simple chain detection
-    print("📝 Using simple text processing...")
-    
-    # Direct chain detection
-    text_lower = text.lower()
-    
-    # Clean text
-    for wake_word in WAKE_WORDS:
-        text_lower = text_lower.replace(wake_word, "")
-    for word in ["draw", "create", "make", "show", "flowchart", "diagram"]:
-        text_lower = text_lower.replace(word, "")
-    
-    # Remove punctuation
-    import string
-    text_lower = text_lower.translate(str.maketrans('', '', string.punctuation))
-    text_lower = ' '.join(text_lower.split())
-    
-    print(f"🚨 CLEANED TEXT: '{text_lower}'")
-    
-    # Chain detection for "to" patterns
-    if " to " in text_lower:
-        parts = [part.strip() for part in text_lower.split(" to ")]
-        print(f"🚨 FOUND {len(parts)} PARTS: {parts}")
-        
-        if len(parts) >= 2:
-            print(f"🚨 CREATING CHAIN")
-            lines = ["graph TD"]
-            for i in range(len(parts) - 1):
-                source = parts[i].strip().title()
-                target = parts[i + 1].strip().title()
-                if source and target:
-                    source_id = source.replace(" ", "_")
-                    target_id = target.replace(" ", "_")
-                    lines.append(f"    {source_id}[{source}] --> {target_id}[{target}]")
-            
-            result = "\n".join(lines)
-            print(f"🚨 CHAIN RESULT:\n{result}")
-            return result
-    
-    print("🚨 NO CHAIN DETECTED, USING FALLBACK")
-    
-    # Fallback to old logic
+    """Generate Mermaid diagram from actual speech content."""
     nodes, connections = extract_nodes_from_speech(text)
     
     if not connections:
@@ -259,7 +166,7 @@ def should_generate_diagram(text: str) -> bool:
     return any(keyword in text_lower for keyword in keywords)
 
 class EnhancedTranscriber:
-    """Enhanced transcriber with wake word detection and LLaMA integration."""
+    """Enhanced transcriber with wake word detection."""
     
     def __init__(self):
         self.audio_buffer = []
@@ -273,13 +180,6 @@ class EnhancedTranscriber:
         if not Path(WHISPER_MODEL).exists():
             print(f"❌ Whisper model not found: {WHISPER_MODEL}")
             sys.exit(1)
-        
-        # Initialize LLaMA
-        llama_ready = initialize_llama()
-        if llama_ready:
-            print("🧠 Enhanced pipeline ready with LLaMA intelligence!")
-        else:
-            print("📝 Enhanced pipeline ready with simple text processing")
         
         signal.signal(signal.SIGINT, signal_handler)
         print("✅ Enhanced voice-to-Mermaid pipeline ready!")
@@ -325,7 +225,7 @@ class EnhancedTranscriber:
         # Check timeout
         if listening_for_command and time.time() - wake_word_detected_time > WAKE_WORD_TIMEOUT:
             listening_for_command = False
-            print("⏰ Wake word timeout - back to listening for 'Computer'")
+            print("⏰ Wake word timeout - back to listening for 'Hey PBM'")
         
         # Add to buffer
         audio_chunk = indata.flatten()
@@ -353,7 +253,7 @@ class EnhancedTranscriber:
                         print(mermaid_result)
                         print("```\n")
                     elif not listening_for_command:
-                        print("💬 Say 'Computer' followed by a diagram command")
+                        print("💬 Say 'Hey PBM' followed by a diagram command")
             
             # Reset buffer
             self.audio_buffer = []
@@ -366,22 +266,22 @@ class EnhancedTranscriber:
         print("🎨 Smart content-aware diagram generation")
         
         print("\n🔥 NEW FEATURES:")
-        print("   🎯 Wake Word Detection: Say 'Computer' first!")
+        print("   🎯 Wake Word Detection: Say 'Hey PBM' first!")
         print("   🎨 Smart Content Parsing: Uses your actual words!")
         
         print("\n💡 How to use:")
-        print("   1. Say: 'Computer'")
+        print("   1. Say: 'Hey PBM'")
         print("   2. Then: 'Draw user to database'")
-        print("   3. Or: 'Computer, create login to dashboard'")
+        print("   3. Or: 'Hey PBM, create login to dashboard'")
         
         print("\n📝 Example commands:")
-        print("   • 'Computer, draw user to database'")
-        print("   • 'Computer, create login to dashboard'")
-        print("   • 'Computer, show payment to confirmation'")
-        print("   • 'Computer, make authentication then success'")
+        print("   • 'Hey PBM, draw user to database'")
+        print("   • 'Hey PBM, create login to dashboard'")
+        print("   • 'Hey PBM, show payment to confirmation'")
+        print("   • 'Hey PBM, make authentication then success'")
         
         print("\nPress Ctrl+C to stop")
-        print("👂 Listening for 'Computer'...")
+        print("👂 Listening for 'Hey PBM'...")
         
         with sd.InputStream(
             samplerate=SAMPLE_RATE,

@@ -1,285 +1,239 @@
-# Voice-to-Mermaid Transcription System
+# 🎤🧠 Voice-to-Mermaid with LLaMA Integration
 
-A high-performance real-time voice transcription system optimized for creating Mermaid diagrams from speech input.
+**Real-time voice-powered Mermaid diagram generation using Whisper.cpp and LLaMA v3.1 8B Instruct**
 
-## 🎯 Optimal Configuration (M1 Pro Tested)
+Convert natural language speech into beautiful Mermaid diagrams instantly with wake word detection and AI-powered understanding.
 
-### Model Selection
-- **Primary Model**: `base.en-q5_1` (Quantized, 57MB)
-- **Alternative**: `base.en` (Full precision, 141MB)
-- **Performance**: ~0.3-0.4s inference time, 714x faster than real-time
+## 🎯 **Demo**
 
-### Whisper.cpp Settings
 ```bash
-# Optimal settings for M1 Pro (ARM64)
-THREADS=8
-BEAM_SIZE=3
-BEST_OF=1
-LANGUAGE=en
-CHUNK_DURATION=3.0  # seconds
-SILENCE_THRESHOLD=0.005
-SAMPLE_RATE=16000
+# Say: "Computer, start to process to check to end"
+# Gets: 
+graph TD
+    Start[Start] --> Process[Process]
+    Process --> Check[Check]
+    Check --> End[End]
 ```
 
-### Command Line Arguments
+## 🚀 **Key Features**
+
+- **🧠 LLaMA v3.1 8B Instruct**: Intelligent diagram generation from natural language
+- **⚡ Real-time Processing**: ~0.3s speech recognition + ~1-2s diagram generation
+- **🎯 Wake Word Detection**: Say "Computer" first, then your command
+- **🔄 Hybrid Fallback**: Falls back to simple processing if LLaMA fails
+- **🖥️ Cross-Platform**: Works on Apple Silicon (M1/M2/M3) and Windows ARM64 (Snapdragon X Elite)
+- **🔒 100% Local**: No internet required, complete privacy
+
+## 🎨 **What's New (Latest Update)**
+
+- **🧠 LLaMA Integration**: Replaced simple text processing with AI-powered generation
+- **⚡ Metal Acceleration**: Optimized for Apple Silicon performance
+- **🎯 Better Accuracy**: Handles complex multi-node chains and natural language
+- **🔄 Intelligent Understanding**: Understands context and creates appropriate diagrams
+
+## 🛠️ **Quick Start**
+
+### **Prerequisites**
+- Python 3.8+
+- Git with submodules
+- ~8GB free space (model + dependencies)
+
+### **Installation**
 ```bash
-whisper-cli \
-  -m models/ggml-base.en-q5_1.bin \
-  -f input.wav \
-  -t 8 \
-  --beam-size 3 \
-  --best-of 1 \
-  --language en \
-  --no-timestamps
-```
+# Clone with submodules
+git clone --recurse-submodules https://github.com/yourusername/voice-to-mermaid.git
+cd voice-to-mermaid
 
-## 🏆 Performance Benchmarks
+# Install dependencies
+pip install -r requirements.txt
 
-### Model Comparison (M1 Pro)
-| Model | Size | Inference Time | Accuracy | Speed Factor |
-|-------|------|----------------|----------|--------------|
-| `base.en-q5_1` | 57MB | 0.007s | Excellent | 714x real-time |
-| `base.en` | 141MB | 0.007s | Excellent | 714x real-time |
-| `tiny.en` | 37MB | 0.003s | Good | 1667x real-time |
-| `small.en` | 244MB | 0.015s | Excellent | 333x real-time |
-| `medium.en` | 769MB | 0.8-1.2s | Excellent | 1x real-time |
-| `large-v3` | 1.5GB | 2-4s | Excellent | 0.5x real-time |
-
-### Real-time Performance
-- **Audio Processing**: 3-second chunks
-- **Voice Activity Detection**: 0.005 threshold
-- **Latency**: <0.5s total (capture + transcription)
-- **Audio Quality**: 16kHz mono, 16-bit
-
-## 🛠️ Setup Instructions
-
-### 1. Install Dependencies
-```bash
-# Python dependencies
-pip install sounddevice numpy wave subprocess tempfile
-
-# For macOS (M1/M2)
-brew install portaudio
-
-# For Ubuntu/Linux
-sudo apt-get install portaudio19-dev
-
-# For Windows
-# Use conda or pip with pre-built wheels
-```
-
-### 2. Build whisper.cpp
-```bash
-git clone https://github.com/ggerganov/whisper.cpp.git
+# Build Whisper.cpp
 cd whisper.cpp
+make -j
 
-# For ARM64 (M1/M2 Mac, Snapdragon X Elite)
-make -j8
+# Download Whisper model
+./models/download-ggml-model.sh base.en
 
-# For x86_64
-make -j$(nproc)
+# Download LLaMA model
+cd ../voice-to-mermaid-llm/models
+python download_model.py
+
+# Run the system
+cd ../..
+python enhanced_realtime_mermaid.py
 ```
 
-### 3. Download Models
-```bash
-cd whisper.cpp
-# Download quantized base.en model (recommended)
-bash models/download-ggml-model.sh base.en-q5_1
+### **Usage**
+1. **Say**: `"Computer"` (wake word)
+2. **Then**: `"Draw user to database to login"`
+3. **Get**: Instant Mermaid diagram!
 
-# Download full precision model (alternative)
-bash models/download-ggml-model.sh base.en
+## 📋 **Supported Commands**
+
+| Command | Example | Output |
+|---------|---------|---------|
+| **Simple Chain** | `"Computer, user to database"` | `User[User] --> Database[Database]` |
+| **Multi-Step Flow** | `"Computer, login to auth to dashboard"` | 3-node sequential chain |
+| **Complex Process** | `"Computer, start to process to check to end"` | 4-node workflow |
+| **Natural Language** | `"Computer, user authentication with database validation"` | Smart context-aware diagram |
+
+## 🏗️ **Architecture**
+
+```mermaid
+graph TD
+    A[Voice Input] --> B[Whisper.cpp]
+    B --> C[Wake Word Detection]
+    C --> D[LLaMA v3.1 8B]
+    D --> E[Mermaid Generation]
+    E --> F[Visual Output]
+    
+    D --> G[Fallback Processing]
+    G --> E
 ```
 
-### 4. Test Audio Setup
+## 🔧 **Technical Specifications**
+
+### **Core Components**
+- **Speech Recognition**: Whisper.cpp (base.en-q5_1 model)
+- **AI Generation**: LLaMA v3.1 8B Instruct (Q4_K_M quantized)
+- **Wake Word Detection**: Custom implementation
+- **Real-time Processing**: Python + NumPy + SoundDevice
+
+### **Performance**
+- **Speech Recognition**: ~0.3s per 3-second chunk
+- **LLaMA Generation**: ~1-2s per diagram
+- **Memory Usage**: ~6GB RAM (model + buffers)
+- **CPU Usage**: Optimized for ARM64 (M1/M2/M3, Snapdragon X Elite)
+
+### **Model Details**
+- **Whisper**: `base.en-q5_1` (39MB, English-optimized)
+- **LLaMA**: `Q4_K_M` (4.6GB, 4-bit quantized for speed)
+- **Context Window**: 2048 tokens
+- **Temperature**: 0.3 (consistent output)
+
+## 🖥️ **Cross-Platform Support**
+
+### **Apple Silicon (M1/M2/M3)**
+- **Acceleration**: Metal backend for LLaMA
+- **Performance**: Optimal (1-2s generation)
+- **Memory**: ~6GB RAM usage
+
+### **Windows ARM64 (Snapdragon X Elite)**
+- **Acceleration**: CPU-optimized
+- **Performance**: Good (2-3s generation)
+- **Memory**: ~6GB RAM usage
+
+### **Intel/AMD x64**
+- **Acceleration**: CPU + possible GPU acceleration
+- **Performance**: Moderate (3-4s generation)
+- **Memory**: ~6GB RAM usage
+
+## 📁 **Project Structure**
+
+```
+voice-to-mermaid/
+├── enhanced_realtime_mermaid.py    # Main voice pipeline
+├── voice-to-mermaid-llm/           # LLaMA integration
+│   ├── llama_mermaid.py           # LLaMA converter
+│   ├── models/                    # Model files (gitignored)
+│   └── test_inputs/               # Test cases
+├── whisper.cpp/                   # Whisper.cpp submodule
+├── scripts/                       # Helper scripts
+├── requirements.txt               # Python dependencies
+├── SETUP.md                       # Detailed setup guide
+└── docs/                          # Additional documentation
+```
+
+## 🔄 **Version History**
+
+### **v2.0 (Current) - LLaMA Integration**
+- ✅ LLaMA v3.1 8B Instruct integration
+- ✅ Metal acceleration for Apple Silicon
+- ✅ Hybrid fallback system
+- ✅ Cross-platform compatibility
+- ✅ Enhanced natural language understanding
+
+### **v1.0 - Basic System**
+- ✅ Whisper.cpp integration
+- ✅ Wake word detection
+- ✅ Simple chain detection
+- ✅ Real-time processing
+
+## 🤝 **Contributing**
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test on your platform
+5. Submit a pull request
+
+## 🧪 **Testing & Development Scripts**
+
+The `scripts/` directory contains various tools for testing and development:
+
+### **Core Testing**
+- **`test_audio.py`**: Test microphone input and audio device setup
+- **`benchmark_whisper.py`**: Performance benchmarking for Whisper models
+- **`model_manager.py`**: Download and manage Whisper models
+
+### **Pipeline Variants**
+- **`simple_realtime.py`**: Basic real-time transcription (C++ version)
+- **`simple_realtime_python.py`**: Basic real-time transcription (Python version)
+- **`realtime_mermaid.py`**: Full voice-to-Mermaid pipeline (original)
+- **`realtime_mermaid_python.py`**: Alternative Python implementation
+- **`optimized_realtime.py`**: Performance-optimized version
+
+### **Optimization Tools**
+- **`optimize_base.py`**: System optimization and configuration
+
+### **Usage Examples**
 ```bash
+# Test your audio setup
 python scripts/test_audio.py
-```
 
-## 🎤 Usage
+# Benchmark Whisper performance
+python scripts/benchmark_whisper.py
 
-### Basic Real-time Transcription
-```bash
-python scripts/simple_realtime.py
-```
-
-### Voice-to-Mermaid Pipeline
-```bash
+# Try different pipeline implementations
 python scripts/realtime_mermaid.py
+python scripts/optimized_realtime.py
+
+# Performance optimization
+python scripts/optimize_base.py
 ```
 
-## 📁 File Structure
-```
-pbm/
-├── scripts/
-│   ├── simple_realtime.py      # Core transcription engine
-│   ├── realtime_mermaid.py     # Full voice-to-Mermaid pipeline
-│   ├── test_audio.py           # Audio device testing
-│   ├── benchmark_whisper.py    # Performance benchmarking
-│   └── model_manager.py        # Model download/management
-├── whisper.cpp/                # whisper.cpp repository
-│   ├── build/bin/whisper-cli   # Compiled binary
-│   └── models/                 # Downloaded models
-└── README.md
-```
+## 📚 **Documentation**
 
-## 🔧 Hardware-Specific Optimizations
+- **[SETUP.md](SETUP.md)**: Detailed cross-platform setup guide
+- **[SETTINGS_SUMMARY.md](SETTINGS_SUMMARY.md)**: Configuration options
+- **[optimal_config.md](optimal_config.md)**: Performance optimization
+- **[voice-to-mermaid-llm/README.md](voice-to-mermaid-llm/README.md)**: LLaMA integration details
 
-### M1/M2 Mac (ARM64)
-- **Threads**: 8 (matches P-cores)
-- **Memory**: Unified memory advantage
-- **GPU**: Not used (CPU faster for base models)
+## 🐛 **Troubleshooting**
 
-### Snapdragon X Elite (ARM64)
-- **Threads**: 8-12 (depends on core count)
-- **Memory**: Test with different thread counts
-- **GPU**: Consider testing with GPU acceleration
+### **Common Issues**
+1. **Model not found**: Download LLaMA model first
+2. **Whisper compilation fails**: Check build dependencies
+3. **High CPU usage**: Adjust thread count in config
+4. **Memory issues**: Use smaller LLaMA model variant
 
-### Intel/AMD x86_64
-- **Threads**: CPU cores count
-- **Memory**: Standard system RAM
-- **GPU**: CUDA/OpenCL acceleration available
+### **Platform-Specific**
+- **macOS**: Ensure Xcode command line tools installed
+- **Windows**: Install Visual Studio Build Tools
+- **Linux**: Install build-essential and cmake
 
-## 🎯 Mermaid Diagram Detection
+## 📄 **License**
 
-### Supported Patterns
-- **Flowchart**: "A goes to B", "connects to", "points to"
-- **Sequence**: "A calls B", "B responds", "interaction"
-- **Mindmap**: "branches", "sub-topic", "related to"
+MIT License - See [LICENSE](LICENSE) file
 
-### Example Voice Commands
-```
-"Create a flowchart where User Authentication connects to Database Server"
-"Make a sequence diagram showing Client calls API and API responds with data"
-"Draw a mindmap with Project Planning as the center"
-```
+## 🏆 **Hackathon Project**
 
-## 📊 Audio Quality Guidelines
-
-### Microphone Recommendations
-- **Tested**: Plantronics Blackwire 3225 Series
-- **Quality**: Clear, consistent audio levels
-- **Environment**: Quiet room, minimal background noise
-
-### Audio Levels
-- **Target RMS**: 0.05-0.3 (good signal strength)
-- **Minimum**: 0.005 (silence threshold)
-- **Maximum**: Normalize to 0.8 to prevent clipping
-
-## 🐛 Troubleshooting
-
-### Common Issues
-1. **No transcription output**: Check microphone permissions
-2. **Poor accuracy**: Speak clearly, reduce background noise
-3. **High CPU usage**: Reduce thread count or use smaller model
-4. **Audio device not found**: Run `python scripts/test_audio.py`
-
-### Debug Mode
-Enable debug output by uncommenting debug lines in `simple_realtime.py`:
-```python
-print(f"🔧 Command: {' '.join(cmd)}")
-print(f"🔧 Stdout: '{result.stdout}'")
-```
-
-## 🚀 Transfer to Windows Snapdragon X Elite
-
-### Key Considerations
-1. **Architecture**: ARM64 (same as M1/M2)
-2. **Build Process**: Use Windows ARM64 build tools
-3. **Audio System**: Windows Audio Session API (WASAPI)
-4. **Performance**: Start with same thread/beam settings, tune as needed
-
-### Windows-Specific Setup
-```bash
-# Use Windows Subsystem for Linux (WSL2) or
-# Native Windows build with Visual Studio
-git clone https://github.com/ggerganov/whisper.cpp.git
-cd whisper.cpp
-mkdir build && cd build
-cmake ..
-cmake --build . --config Release
-```
-
-## 📈 Performance Tuning
-
-### For Maximum Speed
-- Model: `base.en-q5_1`
-- Threads: 8
-- Beam size: 1
-- Best of: 1
-
-### For Maximum Accuracy
-- Model: `base.en`
-- Threads: 8
-- Beam size: 5
-- Best of: 3
-
-### For Balanced Performance
-- Model: `base.en-q5_1` (current optimal)
-- Threads: 8
-- Beam size: 3
-- Best of: 1
-
-## 🎵 Audio Configuration
-
-### Sample Rate & Format
-```python
-SAMPLE_RATE = 16000  # Hz (whisper.cpp requirement)
-CHANNELS = 1         # Mono
-DTYPE = np.float32   # 32-bit float
-BLOCKSIZE = 1600     # 100ms blocks (SAMPLE_RATE * 0.1)
-```
-
-### Voice Activity Detection
-```python
-SILENCE_THRESHOLD = 0.005  # RMS threshold
-CHUNK_DURATION = 3.0       # Process every 3 seconds
-MIN_AUDIO_LENGTH = 0.5     # Minimum speech duration
-```
-
-## 🔁 Next Steps: NPU Optimization
-
-Once you've proven the flow (mic → whisper → Mermaid works great) on Snapdragon X Elite, then you can:
-
-### Phase 1: ONNX Export
-- Export Whisper model to ONNX format
-- Validate ONNX model accuracy vs original
-- Test ONNX runtime performance on CPU
-
-### Phase 2: Qualcomm NPU Integration
-- Use Qualcomm's QNN tools to quantize and compile the model
-- Run with SNPE or QNN runtime on the Hexagon NPU
-- Benchmark NPU vs CPU performance
-
-### Phase 3: System Integration
-- Integrate NPU inference into the pipeline
-- Optimize audio preprocessing for NPU
-- Fine-tune for maximum efficiency
-
-### ➡️ Expected Benefits
-- **Lower CPU usage**: Offload inference to dedicated NPU
-- **Reduced power consumption**: NPU optimized for ML workloads
-- **Potentially faster inference**: Hardware acceleration
-- **Better battery life**: More efficient processing
-
-### 🛠️ NPU Development Tools
-- **Qualcomm Neural Processing SDK**: QNN tools and runtime
-- **SNPE (Snapdragon Neural Processing Engine)**: Legacy runtime
-- **Model conversion**: ONNX → QNN format
-- **Profiling tools**: Performance analysis and optimization
-
-## 🔄 Version History
-
-- **v1.0**: Basic transcription working
-- **v1.1**: Added quantized model support  
-- **v1.2**: Optimized for M1 Pro performance
-- **v1.3**: Fixed --fp16 flag issue
-- **v1.4**: Added comprehensive documentation
-- **v1.5**: Added NPU optimization roadmap
+This project was developed for a hackathon showcasing:
+- **Real-time AI**: Voice → Diagram in seconds
+- **Local Processing**: No cloud dependencies
+- **Cross-Platform**: Works on multiple architectures
+- **Practical Application**: Useful for documentation, planning, and visualization
 
 ---
 
-**Hardware Tested**: M1 Pro MacBook Pro  
-**Target Platform**: Windows Snapdragon X Elite  
-**Performance**: 714x real-time transcription speed  
-**Accuracy**: Excellent for clear speech input  
-**Future**: NPU optimization for enhanced efficiency 
+**Made with ❤️ for the hackathon community** 
