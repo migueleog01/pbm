@@ -1,2 +1,25 @@
-sounddevice
-numpy 
+# Voice-to-Mermaid Pipeline Dependencies
+# Core audio processing
+sounddevice>=0.4.6
+numpy>=1.24.0
+
+# LLaMA Integration
+llama-cpp-python>=0.2.0
+huggingface-hub>=0.16.0
+
+# Optional: For better performance on specific platforms
+# Uncomment based on your system:
+
+# For Apple Silicon (M1/M2/M3) with Metal acceleration
+# llama-cpp-python[metal]>=0.2.0
+
+# For CUDA support (NVIDIA GPUs)
+# llama-cpp-python[cuda]>=0.2.0
+
+# For OpenBLAS support (general CPU optimization)
+# llama-cpp-python[openblas]>=0.2.0
+
+# Development dependencies (optional)
+# pytest>=7.0.0
+# black>=23.0.0
+# flake8>=5.0.0 
