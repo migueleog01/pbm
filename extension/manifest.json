@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "Voice to Mermaid",
+  "version": "1.0",
+  "description": "📊 Generate Mermaid diagrams from voice commands using LLaMA AI - say 'hey computer' to start",
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1:5000/*",
+    "http://localhost:5000/*",
+    "http://*/*",
+    "https://*/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Voice to Mermaid - Say 'hey computer'"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+  "icons": {
+    "16": "icons/icon.png",
+    "48": "icons/icon.png",
+    "128": "icons/icon.png"
+  }
+} 
